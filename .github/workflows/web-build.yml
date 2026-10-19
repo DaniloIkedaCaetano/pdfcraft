@@ -1,0 +1,41 @@
+name: Web build
+
+# Compila o PdfCraft Web (WebAssembly) e publica o site estático na branch
+# `web-build`, de onde um projeto estático (por exemplo na Vercel) o serve.
+# Só roda quando acionado à mão (Actions > Web build > Run workflow).
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  web:
+    name: trunk build --release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+        with:
+          toolchain: stable
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: web-build
+      - name: Instalar o trunk
+        run: cargo install trunk --locked --version 0.21.14
+      - name: Compilar
+        working-directory: apps/pdfcraft-web
+        run: trunk build --release
+      - name: Juntar as licenças ao site
+        run: cp LICENSE-MIT LICENSE-APACHE NOTICE ATTRIBUTION.md dist/web/
+      - name: Publicar na branch web-build
+        working-directory: dist/web
+        run: |
+          git init -b web-build
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "PdfCraft Web (${GITHUB_SHA::7})"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" web-build
